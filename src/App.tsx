@@ -8,7 +8,9 @@ import { useTimers } from "./hooks/useTimers";
 import { INITIAL_ARTIFACTS, PLANS } from "./lib/data";
 import type { Artifact, DownloadState, KindFilter, Plan, Range, View } from "./lib/types";
 import { AnalyticsView } from "./views/AnalyticsView";
+import { ContextMigrationView } from "./views/ContextMigrationView";
 import { GalleryView } from "./views/GalleryView";
+import { KnowledgeBaseView } from "./views/KnowledgeBaseView";
 import { LoginView } from "./views/LoginView";
 import { WorkspaceView } from "./views/WorkspaceView";
 
@@ -121,8 +123,17 @@ export default function App() {
 
   const used = Math.min(142 + runs * 2, PLANS[plan].rpd);
   const firstUser = messages.find((m) => m.role === "user");
-  const threadTitle = activeChat ?? (firstUser && firstUser.role === "user" ? firstUser.text : "New chat");
-  const title = currentView === "workspace" ? threadTitle : currentView === "analytics" ? "Analytics" : "Artifacts";
+  const threadTitle = activeChat ?? (firstUser && firstUser.role === "user" ? firstUser.text : "Workspace");
+  const title =
+    currentView === "workspace"
+      ? threadTitle
+      : currentView === "analytics"
+      ? "Settings & Usage"
+      : currentView === "knowledge-base"
+      ? "Knowledge Base & Indexing"
+      : currentView === "context-migration"
+      ? "Context Distillation & Migration"
+      : "Artifacts";
 
   return (
     <div className="min-h-screen bg-canvas text-zinc-100 flex font-sans relative h-screen overflow-hidden antialiased">
@@ -142,7 +153,14 @@ export default function App() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar title={title} stage={stage} onOpenSidebar={() => setSidebarOpen(true)} onNavigate={go} />
+        <TopBar
+          title={title}
+          stage={stage}
+          plan={plan}
+          email={email}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onNavigate={go}
+        />
 
         {currentView === "workspace" && (
           <WorkspaceView
@@ -157,10 +175,15 @@ export default function App() {
             autoRoute={autoRoute}
             setAutoRoute={setAutoRoute}
             plan={plan}
+            email={email}
             onSend={send}
             onNavigate={go}
           />
         )}
+
+        {currentView === "knowledge-base" && <KnowledgeBaseView onNavigate={go} />}
+
+        {currentView === "context-migration" && <ContextMigrationView onNavigate={go} />}
 
         {currentView === "analytics" && (
           <AnalyticsView

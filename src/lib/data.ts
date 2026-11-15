@@ -134,6 +134,64 @@ export const FILTERS: { key: KindFilter; label: string }[] = [
   { key: "pptx", label: "Slides" },
 ];
 
+// New platform-core nav (replaces NAV in sidebar)
+export const PLATFORM_NAV: { view: View; label: string; badge?: string; badgeStyle?: string }[] = [
+  { view: "workspace", label: "Workspace Chat" },
+  { view: "knowledge-base", label: "Knowledge Base", badge: "32 docs", badgeStyle: "text-zinc-500" },
+  { view: "context-migration", label: "Context & Migration", badge: "80% Limit", badgeStyle: "text-amber-400" },
+  { view: "analytics", label: "Settings & Usage", badge: "Pro", badgeStyle: "text-indigo-400" },
+  { view: "gallery", label: "Artifacts", badge: "8 files", badgeStyle: "text-zinc-500" },
+];
+
+// Enhanced sessions with model names (replaces HISTORY in sidebar)
+export const SESSIONS = [
+  {
+    group: "Today",
+    items: [
+      { title: "Architecture Review & Kernel", model: "Claude 3.5 Sonnet" },
+      { title: "Latency Telemetry Synthesis", model: "DeepSeek-V3" },
+      { title: "Q4 Pitch Deck", model: "Gemini 1.5 Pro" },
+    ],
+  },
+  {
+    group: "Previous 7 Days",
+    items: [
+      { title: "Vector Indexing Pipeline", model: "Gemini 1.5 Pro" },
+      { title: "FinOps Q4 Allocations", model: "Claude 3.5 Sonnet" },
+    ],
+  },
+];
+
+// Knowledge base indexed files
+export const KB_FILES = [
+  { name: "FinOps_Budget_Q4_Allocation.pdf", size: "3.8 MB", chunks: 2480, icon: "pdf" as const },
+  { name: "Security_Audit_SOC2_Type2.pdf", size: "5.2 MB", chunks: 3120, icon: "shield" as const },
+  { name: "API_Gateway_Specification.md", size: "140 KB", chunks: 560, icon: "code" as const },
+];
+
+// Per-model billing detail for the Settings & Usage view
+export const MODEL_CONSUMPTION = [
+  { name: "Claude 3.5 Sonnet", desc: "Reasoning & Synthesis", cost: 17.28, tokens: "2.4M tokens", barPct: 55, bar: "bg-indigo-500" },
+  { name: "DeepSeek-V3", desc: "Auto-Routed (82%)", cost: 5.10, tokens: "18.2M tokens", barPct: 20, bar: "bg-green-500" },
+  { name: "Gemini 1.5 Pro", desc: "Long-Context Vector Embeddings", cost: 42.35, tokens: "12.1M tokens", barPct: 68, bar: "bg-blue-500" },
+  { name: "FLUX.1 Schnell & Tavily Grounding", desc: "Search & Multimodal", cost: 12.70, tokens: "990 ops", barPct: 25, bar: "bg-zinc-500" },
+];
+
+// Available models for the model selector
+export const MODELS = [
+  { id: "claude-3-5", name: "Claude 3.5 Sonnet", badge: "Reasoning" },
+  { id: "deepseek-v3", name: "DeepSeek-V3", badge: "Code" },
+  { id: "gemini-1-5", name: "Gemini 1.5 Pro", badge: "Long-Context" },
+  { id: "flux-1", name: "FLUX.1 Schnell", badge: "Image" },
+];
+
+// Updated workspace suggestions (FYP relevant)
+export const WORKSPACE_SUGGESTIONS = [
+  "Analyze distributed payment p99 latency",
+  "Review FastAPI connection leasing code",
+  "Draft architectural diagram for board review",
+];
+
 export const SAMPLE_CODE = `export function PricingCard({ tier, price, features }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">

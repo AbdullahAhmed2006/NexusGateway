@@ -2,19 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, RefObject } from "react";
 import {
   ArrowUp,
+  ChevronDown,
   ChevronRight,
   FileText,
   FlaskConical,
   Image as ImageIcon,
   Layers,
+  LayoutGrid,
   Loader,
   Lock,
   Mic,
   Paperclip,
   Plus,
+  Sparkles,
   Upload,
   X,
 } from "lucide-react";
+import { MODELS } from "../lib/data";
 import type { Plan, Setter, Stage } from "../lib/types";
 
 type ChatInputProps = {
@@ -42,7 +46,7 @@ const MENU_SECTION_B = [
   { icon: FileText, label: "Generate / Edit document", action: "document" },
 ];
 
-/** Bottom multimodal composer: text area, + menu, mic, Auto-Route switch, and send. */
+/** Bottom multimodal composer: text area, + menu, model selector, mic, Auto-Route switch, and send. */
 export function ChatInput({
   input,
   setInput,
@@ -60,7 +64,13 @@ export function ChatInput({
   const fileRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const plusBtnRef = useRef<HTMLButtonElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modelBtnRef = useRef<HTMLButtonElement>(null);
+
   const [plusOpen, setPlusOpen] = useState(false);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("Claude 3.5 Sonnet");
+
   const canSend = input.trim().length > 0 && stage === 0;
   const isPro = plan === "pro";
 
@@ -72,11 +82,11 @@ export function ChatInput({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input, textareaRef]);
 
-  // Close + menu on outside click
+  // Close menus on outside click
   useEffect(() => {
-    if (!plusOpen) return;
     const handler = (e: MouseEvent) => {
       if (
+        plusOpen &&
         menuRef.current &&
         !menuRef.current.contains(e.target as Node) &&
         plusBtnRef.current &&
@@ -84,10 +94,19 @@ export function ChatInput({
       ) {
         setPlusOpen(false);
       }
+      if (
+        modelMenuOpen &&
+        modelMenuRef.current &&
+        !modelMenuRef.current.contains(e.target as Node) &&
+        modelBtnRef.current &&
+        !modelBtnRef.current.contains(e.target as Node)
+      ) {
+        setModelMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [plusOpen]);
+  }, [plusOpen, modelMenuOpen]);
 
   const onComposerKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -101,22 +120,19 @@ export function ChatInput({
     if (action === "upload") {
       fileRef.current?.click();
     }
-    // Other actions are UI-only in this prototype
   };
 
   return (
     <div className="shrink-0 px-6 pb-4">
       <div className="mx-auto w-full max-w-3xl relative">
-
         {/* ── + popup menu ── */}
         {plusOpen && (
           <div
             ref={menuRef}
             className="absolute bottom-full mb-2 left-0 z-50 w-64 rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/60 overflow-hidden"
           >
-            {/* header */}
             <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-              <span className="text-sm font-medium text-zinc-200">Ask Nexus</span>
+              <span className="text-sm font-semibold text-zinc-200">Ask Nexus</span>
               <button
                 onClick={() => setPlusOpen(false)}
                 className="text-zinc-500 transition hover:text-zinc-200"
@@ -126,13 +142,12 @@ export function ChatInput({
               </button>
             </div>
 
-            {/* Section A */}
             <div className="p-1.5">
               {MENU_SECTION_A.map((item) => (
                 <button
                   key={item.action}
                   onClick={() => handleMenuAction(item.action)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
                 >
                   <item.icon size={16} className="shrink-0 text-zinc-400" />
                   {item.label}
@@ -142,13 +157,12 @@ export function ChatInput({
 
             <div className="mx-3 h-px bg-zinc-800" />
 
-            {/* Section B */}
             <div className="p-1.5">
               {MENU_SECTION_B.map((item) => (
                 <button
                   key={item.action}
                   onClick={() => handleMenuAction(item.action)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
                 >
                   <item.icon size={16} className="shrink-0 text-zinc-400" />
                   <span className="flex-1 text-left">{item.label}</span>
@@ -159,8 +173,37 @@ export function ChatInput({
           </div>
         )}
 
+        {/* ── Model selector popup ── */}
+        {modelMenuOpen && (
+          <div
+            ref={modelMenuRef}
+            className="absolute bottom-full mb-2 left-16 z-50 w-60 rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/60 overflow-hidden p-1.5"
+          >
+            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Primary Model
+            </p>
+            {MODELS.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => {
+                  setSelectedModel(m.name);
+                  setModelMenuOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs transition ${
+                  selectedModel === m.name
+                    ? "bg-zinc-800 font-medium text-indigo-300"
+                    : "text-zinc-300 hover:bg-zinc-800/60"
+                }`}
+              >
+                <span>{m.name}</span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{m.badge}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── composer box ── */}
-        <div className="rounded-xl border border-zinc-800/50 bg-surface transition duration-150 focus-within:border-indigo-500 focus-within:ring-[3px] focus-within:ring-indigo-500/25">
+        <div className="rounded-xl border border-zinc-800/60 bg-surface transition duration-150 focus-within:border-indigo-500 focus-within:ring-[3px] focus-within:ring-indigo-500/25">
           {files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-3 pt-3">
               {files.map((f) => (
@@ -184,15 +227,15 @@ export function ChatInput({
 
           <textarea
             ref={textareaRef}
-            rows={1}
+            rows={2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onComposerKey}
-            placeholder={recording ? "Listening…" : "Ask anything, or describe a task to route"}
+            placeholder={recording ? "Listening…" : "How can Nexus help you today?"}
             className="block max-h-[200px] w-full resize-none bg-transparent px-4 pt-3.5 text-sm leading-[22px] text-zinc-50 placeholder:text-zinc-600 focus:outline-none"
           />
 
-          <div className="flex items-center gap-2 px-3 pb-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-3 pt-2">
             <input
               ref={fileRef}
               type="file"
@@ -220,7 +263,17 @@ export function ChatInput({
               <Plus size={16} />
             </button>
 
-            {/* mic button */}
+            {/* Canvas / Table icon */}
+            <button
+              aria-label="Canvas / Grid mode"
+              title="Canvas &amp; tables"
+              onClick={() => {}}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-100"
+            >
+              <LayoutGrid size={14} />
+            </button>
+
+            {/* Mic button */}
             <button
               aria-label={recording ? "Stop voice input" : "Start voice input"}
               aria-pressed={recording}
@@ -235,7 +288,19 @@ export function ChatInput({
               <Mic size={15} />
             </button>
 
-            <span className="mx-1 h-5 w-px bg-zinc-800" />
+            {/* Model Selector Dropdown Pill */}
+            <button
+              ref={modelBtnRef}
+              onClick={() => setModelMenuOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
+            >
+              <span className="h-2 w-2 rounded-full bg-indigo-400" />
+              <span className="font-medium">{selectedModel}</span>
+              {autoRoute && <span className="text-indigo-400 font-medium">+ Auto-Router</span>}
+              <ChevronDown size={12} className="text-zinc-500 ml-0.5" />
+            </button>
+
+            <span className="mx-0.5 h-4 w-px bg-zinc-800 hidden sm:block" />
 
             {/* Auto-Route toggle */}
             <div className="flex items-center gap-2">
@@ -243,12 +308,12 @@ export function ChatInput({
                 role="switch"
                 aria-checked={autoRoute}
                 disabled={!isPro}
-                onClick={() => { if (isPro) setAutoRoute((v) => !v); }}
+                onClick={() => {
+                  if (isPro) setAutoRoute((v) => !v);
+                }}
                 title={isPro ? "Toggle Auto-Route" : "Upgrade to Pro to toggle Auto-Route"}
-                className={`flex items-center gap-2 text-[13px] transition duration-150 ${
-                  isPro
-                    ? "cursor-pointer text-zinc-400 hover:text-zinc-200"
-                    : "cursor-not-allowed text-zinc-500"
+                className={`flex items-center gap-2 text-xs transition duration-150 ${
+                  isPro ? "cursor-pointer text-zinc-400 hover:text-zinc-200" : "cursor-not-allowed text-zinc-500"
                 }`}
               >
                 <span
@@ -262,11 +327,11 @@ export function ChatInput({
                     }`}
                   />
                 </span>
-                Auto-Route
+                <span className="hidden sm:inline">Auto-Route</span>
               </button>
               {!isPro && (
                 <span
-                  title="Auto-Route is always on for Free users. Upgrade to Pro to control it."
+                  title="Auto-Route is always on for Free users. Upgrade to Pro to toggle."
                   className="flex items-center gap-1 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400"
                 >
                   <Lock size={9} />
@@ -275,12 +340,12 @@ export function ChatInput({
               )}
             </div>
 
-            {/* send */}
+            {/* Send button */}
             <button
               aria-label="Send message"
               onClick={onSend}
               className={`ml-auto flex h-8 w-8 items-center justify-center rounded-lg transition duration-150 active:scale-[0.98] ${
-                canSend ? "bg-zinc-100 text-black hover:bg-white" : "bg-zinc-800 text-zinc-500"
+                canSend ? "bg-indigo-600 text-white hover:bg-indigo-500" : "bg-zinc-800 text-zinc-500"
               }`}
             >
               {stage !== 0 ? <Loader size={15} className="animate-spin" /> : <ArrowUp size={16} />}
@@ -290,10 +355,10 @@ export function ChatInput({
 
         <p className="mt-2 text-center text-xs text-zinc-600">
           {!isPro
-            ? "Auto-Route is always on — upgrade to Pro to control it."
+            ? "Auto-Route is always active for Free Tier users."
             : autoRoute
-            ? "Nexus picks the best model for each task."
-            : "Auto-Route is off. Tasks go to your default model."}
+            ? "Nexus picks the optimal model for each subtask in parallel."
+            : "Auto-Route is off. Tasks go to default model."}
         </p>
       </div>
     </div>

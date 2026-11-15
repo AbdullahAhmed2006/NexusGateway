@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
-/** The three pages reachable from the sidebar once signed in. */
-export type View = "workspace" | "analytics" | "gallery";
+/** The five pages reachable from the sidebar once signed in. */
+export type View = "workspace" | "analytics" | "gallery" | "knowledge-base" | "context-migration";
 export type Plan = "free" | "pro";
 export type Range = "24h" | "7d" | "30d";
 export type Kind = "image" | "pdf" | "pptx";
