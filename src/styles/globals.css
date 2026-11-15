@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Matte black design tokens. tailwind.config.ts maps these to bg-canvas and bg-surface. */
+:root {
+  --ng-canvas: #09090b; /* app background, sidebar */
+  --ng-surface: #121214; /* cards, composer, panels */
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ng-canvas);
+}
