@@ -1,9 +1,12 @@
+"use client";
+
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ChevronDown, Eye, EyeOff, Loader, Mail, Moon } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Eye, EyeOff, Loader, Mail, Moon } from "lucide-react";
 import { GitHubIcon, GoogleIcon } from "../components/BrandIcons";
+import { ForgotPasswordModal } from "../components/ForgotPasswordModal";
 import { Logo } from "../components/Logo";
-import { useTimers } from "../hooks/useTimers";
+import { createClient, isSupabaseConfigured } from "../lib/supabase/client";
 import { inputClass, oauthClass } from "../lib/ui";
 
 type LoginViewProps = {
@@ -19,22 +22,105 @@ export function LoginView({ email, onEmailChange, onSignIn }: LoginViewProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
-  const { schedule } = useTimers();
-
-  const signIn = (e?: FormEvent) => {
-    e?.preventDefault();
-    if (signingIn) return;
-    setSigningIn(true);
-    schedule(() => {
-      setSigningIn(false);
-      onSignIn();
-    }, 500);
-  };
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const signup = authMode === "signup";
 
+  // Handle OAuth Sign In (Task S1-7)
+  const handleOAuth = async (provider: "google" | "github") => {
+    setErrorMsg(null);
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (error) setErrorMsg(error.message);
+      } catch (err: unknown) {
+        setErrorMsg(err instanceof Error ? err.message : "OAuth connection failed");
+      }
+    } else {
+      // Fallback dev mode
+      onEmailChange(provider === "google" ? "elena.rostova@nexus.ai" : "developer@github.com");
+      onSignIn();
+    }
+  };
+
+  // Handle Email/Password Form (Task S1-3, S1-4, S1-6)
+  const handleSubmit = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (signingIn) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    // Validation
+    if (!email || !email.includes("@")) {
+      setErrorMsg("Please enter a valid email address.");
+      return;
+    }
+
+    if (!password) {
+      setErrorMsg("Please enter your password.");
+      return;
+    }
+
+    if (signup && (password.length < 8 || !/\d/.test(password))) {
+      setErrorMsg("Password must be at least 8 characters long and contain at least 1 number.");
+      return;
+    }
+
+    setSigningIn(true);
+
+    try {
+      if (signup) {
+        // Signup flow (Task S1-3 & S1-4)
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, full_name: name }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || "Signup failed.");
+
+        if (data.requiresVerification) {
+          setSuccessMsg(data.message || "Verification email sent. Please check your inbox!");
+        } else {
+          onSignIn();
+        }
+      } else {
+        // Login flow (Task S1-6)
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || "Invalid credentials.");
+
+        onSignIn();
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Authentication failed.");
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-canvas text-zinc-100 font-sans antialiased flex flex-col justify-between">
+      <ForgotPasswordModal
+        isOpen={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        defaultEmail={email}
+      />
+
       {/* ── Top Header ── */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-900 px-6">
         <div className="flex items-center gap-2.5">
@@ -86,7 +172,11 @@ export function LoginView({ email, onEmailChange, onSignIn }: LoginViewProps) {
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setAuthMode(mode)}
+                  onClick={() => {
+                    setAuthMode(mode);
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
                   className={`flex-1 rounded-lg py-2 text-[13px] font-medium transition duration-150 ${
                     authMode === mode ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                   }`}
@@ -96,13 +186,28 @@ export function LoginView({ email, onEmailChange, onSignIn }: LoginViewProps) {
               ))}
             </div>
 
-            {/* OAuth Buttons */}
+            {/* Error / Success Feedback */}
+            {errorMsg && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                <AlertCircle size={15} className="shrink-0 text-red-400 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                <CheckCircle2 size={15} className="shrink-0 text-emerald-400 mt-0.5" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            {/* OAuth Buttons (Task S1-7) */}
             <div className="space-y-2.5">
-              <button type="button" onClick={() => signIn()} className={oauthClass}>
+              <button type="button" onClick={() => handleOAuth("google")} className={oauthClass}>
                 <GoogleIcon />
                 Continue with Google
               </button>
-              <button type="button" onClick={() => signIn()} className={oauthClass}>
+              <button type="button" onClick={() => handleOAuth("github")} className={oauthClass}>
                 <GitHubIcon />
                 Continue with GitHub
               </button>
@@ -126,7 +231,7 @@ export function LoginView({ email, onEmailChange, onSignIn }: LoginViewProps) {
               </button>
 
               {emailExpanded && (
-                <form onSubmit={signIn} className="mt-3.5 space-y-3.5">
+                <form onSubmit={handleSubmit} className="mt-3.5 space-y-3.5">
                   {signup && (
                     <div>
                       <label htmlFor="name" className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -164,7 +269,11 @@ export function LoginView({ email, onEmailChange, onSignIn }: LoginViewProps) {
                         Password
                       </label>
                       {!signup && (
-                        <button type="button" className="text-[11px] text-indigo-400 hover:text-indigo-300 transition">
+                        <button
+                          type="button"
+                          onClick={() => setForgotOpen(true)}
+                          className="text-[11px] text-indigo-400 hover:text-indigo-300 transition"
+                        >
                           Forgot?
                         </button>
                       )}

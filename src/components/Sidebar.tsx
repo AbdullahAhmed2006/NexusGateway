@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -17,12 +19,15 @@ import {
   Plus,
   Settings,
   Shield,
+  ShieldCheck,
   Sparkles,
   Sun,
   User,
   X,
   Zap,
 } from "lucide-react";
+import { ProfileModal } from "./ProfileModal";
+import { TwoFactorModal } from "./TwoFactorModal";
 import { PLATFORM_NAV, PLANS, SESSIONS } from "../lib/data";
 import type { Plan, Stage, View } from "../lib/types";
 import { tone } from "../lib/ui";
@@ -56,10 +61,11 @@ type SettingsItem = { icon: LucideIcon; label: string; hasArrow?: boolean; actio
 const SETTINGS_ACCOUNT: SettingsItem[] = [
   { icon: BarChart2, label: "Usage limits", action: "usage" },
   { icon: CreditCard, label: "Manage subscription", action: "subscription" },
+  { icon: ShieldCheck, label: "2FA Security & Recovery", action: "2fa" },
   { icon: Zap, label: "Upgrade to Nexus Pro", action: "upgrade" },
 ];
 const SETTINGS_PREFERENCES: SettingsItem[] = [
-  { icon: User, label: "Personal Intelligence", action: "pi" },
+  { icon: User, label: "Personal Intelligence / Profile", action: "pi" },
   { icon: Sun, label: "Theme", hasArrow: true, action: "theme" },
   { icon: Globe, label: "Browser", action: "browser" },
   { icon: HardDrive, label: "Import memory to Nexus Gateway", action: "import-memory" },
@@ -73,28 +79,57 @@ const SETTINGS_PRIVACY: SettingsItem[] = [
 ];
 
 export function Sidebar({
-  currentView, onNavigate, onOpenThread, onSignOut,
-  sidebarOpen, onClose, activeChat, artifactCount, stage, plan, used, email,
+  currentView,
+  onNavigate,
+  onOpenThread,
+  onSignOut,
+  sidebarOpen,
+  onClose,
+  activeChat,
+  artifactCount,
+  stage,
+  plan,
+  used,
+  email,
 }: SidebarProps) {
   const limits = PLANS[plan];
   const usedPct = Math.round((used / limits.rpd) * 100);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(plan === "pro");
+  const [customName, setCustomName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
   const settingsRef = useRef<HTMLDivElement>(null);
   const gearBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Derive display name from email
-  const displayName = email
-    ? email.split("@")[0].replace(/[._]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-    : "Guest";
+  // Derive display name from customName or email
+  const displayName =
+    customName ||
+    (email
+      ? email
+          .split("@")[0]
+          .replace(/[._]/g, " ")
+          .split(" ")
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")
+      : "Huzaifa");
+
   const initial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!settingsOpen) return;
     const handler = (e: MouseEvent) => {
       if (
-        settingsRef.current && !settingsRef.current.contains(e.target as Node) &&
-        gearBtnRef.current && !gearBtnRef.current.contains(e.target as Node)
-      ) setSettingsOpen(false);
+        settingsRef.current &&
+        !settingsRef.current.contains(e.target as Node) &&
+        gearBtnRef.current &&
+        !gearBtnRef.current.contains(e.target as Node)
+      ) {
+        setSettingsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -104,21 +139,51 @@ export function Sidebar({
     if (action === "upgrade" || action === "usage" || action === "subscription") {
       onNavigate("analytics");
       setSettingsOpen(false);
+    } else if (action === "pi") {
+      setProfileOpen(true);
+      setSettingsOpen(false);
+    } else if (action === "2fa") {
+      setTwoFactorOpen(true);
+      setSettingsOpen(false);
     }
   };
 
-  // Savings % (simulated)
   const savingsPct = 68;
 
   return (
     <>
+      {/* Profile & Avatar Modal (Task S1-9) */}
+      <ProfileModal
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        currentEmail={email || "dev@nexus.ai"}
+        currentName={displayName}
+        onUpdate={(newName, newAvatar) => {
+          if (newName) setCustomName(newName);
+          if (newAvatar) setAvatarUrl(newAvatar);
+        }}
+      />
+
+      {/* 2FA & Recovery Modal (Task S1-8) */}
+      <TwoFactorModal
+        isOpen={twoFactorOpen}
+        onClose={() => setTwoFactorOpen(false)}
+        onSuccess={() => setTwoFactorEnabled(true)}
+      />
+
       {sidebarOpen && (
-        <button aria-label="Close sidebar" onClick={onClose}
-          className="absolute inset-0 z-20 bg-black/60 lg:hidden" />
+        <button
+          aria-label="Close sidebar"
+          onClick={onClose}
+          className="absolute inset-0 z-20 bg-black/60 lg:hidden"
+        />
       )}
 
-      <aside className={`absolute inset-y-0 left-0 z-30 flex w-[220px] shrink-0 flex-col border-r border-zinc-800/50 bg-canvas transition-transform duration-200 lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        
+      <aside
+        className={`absolute inset-y-0 left-0 z-30 flex w-[220px] shrink-0 flex-col border-r border-zinc-800/50 bg-canvas transition-transform duration-200 lg:static lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* ── Header ── */}
         <div className="flex h-14 items-center justify-between px-4">
           <button onClick={() => onNavigate("workspace")} className="flex items-center gap-2.5">
@@ -128,16 +193,21 @@ export function Sidebar({
               <span className="text-[10px] text-zinc-500">v2.4 Orchestrator</span>
             </div>
           </button>
-          <button aria-label="Close sidebar" onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-900 lg:hidden">
+          <button
+            aria-label="Close sidebar"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-900 lg:hidden"
+          >
             <X size={16} />
           </button>
         </div>
 
         {/* ── New Unified Chat ── */}
         <div className="px-3 pb-3">
-          <button onClick={() => onOpenThread(null)}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 text-[13px] font-medium text-white transition duration-150 hover:bg-indigo-500 active:scale-[0.98]">
+          <button
+            onClick={() => onOpenThread(null)}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 text-[13px] font-medium text-white transition duration-150 hover:bg-indigo-500 active:scale-[0.98]"
+          >
             <Plus size={15} />
             New Unified Chat
           </button>
@@ -150,14 +220,16 @@ export function Sidebar({
             {PLATFORM_NAV.map((item) => {
               const active = currentView === item.view;
               return (
-                <button key={item.view} onClick={() => onNavigate(item.view)}
+                <button
+                  key={item.view}
+                  onClick={() => onNavigate(item.view)}
                   aria-current={active ? "page" : undefined}
                   className={`flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition duration-150 ${
                     active ? "bg-zinc-900 text-zinc-50" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-                  }`}>
+                  }`}
+                >
                   <NavIcon view={item.view} />
                   <span className="flex-1 text-left">{item.label}</span>
-                  {/* Badge */}
                   {item.view === "workspace" && stage !== 0 && (
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
                   )}
@@ -182,17 +254,20 @@ export function Sidebar({
             <div key={section.group} className="mb-3">
               <p className="px-2 pb-1 text-[11px] text-zinc-600">{section.group}</p>
               {section.items.map((item) => (
-                <button key={item.title} onClick={() => onOpenThread(item.title)}
+                <button
+                  key={item.title}
+                  onClick={() => onOpenThread(item.title)}
                   className={`block w-full rounded-md px-2 py-1.5 text-left transition duration-150 ${
-                    activeChat === item.title && currentView === "workspace"
-                      ? "bg-zinc-900"
-                      : "hover:bg-zinc-900"
-                  }`}>
-                  <p className={`truncate text-[13px] leading-tight ${
-                    activeChat === item.title && currentView === "workspace"
-                      ? "text-zinc-50"
-                      : "text-zinc-400"
-                  }`}>{item.title}</p>
+                    activeChat === item.title && currentView === "workspace" ? "bg-zinc-900" : "hover:bg-zinc-900"
+                  }`}
+                >
+                  <p
+                    className={`truncate text-[13px] leading-tight ${
+                      activeChat === item.title && currentView === "workspace" ? "text-zinc-50" : "text-zinc-400"
+                    }`}
+                  >
+                    {item.title}
+                  </p>
                   <p className="mt-0.5 truncate text-[10px] text-zinc-600">{item.model}</p>
                 </button>
               ))}
@@ -204,56 +279,79 @@ export function Sidebar({
         <div className="p-3 relative">
           {/* Settings panel */}
           {settingsOpen && (
-            <div ref={settingsRef}
-              className="absolute bottom-[80px] left-3 right-3 z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/70">
+            <div
+              ref={settingsRef}
+              className="absolute bottom-[80px] left-3 right-3 z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl shadow-black/70"
+            >
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-3">
                 <span className="text-sm font-semibold text-zinc-100">Settings</span>
                 <button onClick={() => setSettingsOpen(false)} className="text-zinc-500 hover:text-zinc-200" aria-label="Close settings">
                   <X size={15} />
                 </button>
               </div>
+
               {/* Account */}
               <div className="p-2">
                 <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Account</p>
                 {SETTINGS_ACCOUNT.map((item) => (
-                  <button key={item.action} onClick={() => handleSettingsAction(item.action)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]">
+                  <button
+                    key={item.action}
+                    onClick={() => handleSettingsAction(item.action)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
+                  >
                     <item.icon size={15} className="shrink-0 text-zinc-400" />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.label === "Upgrade to Nexus Pro" && <Sparkles size={13} className="text-indigo-400" />}
                   </button>
                 ))}
               </div>
+
               <div className="mx-3 h-px bg-zinc-800" />
+
               {/* Preferences */}
               <div className="p-2">
                 <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Preferences</p>
                 {SETTINGS_PREFERENCES.map((item) => (
-                  <button key={item.action} onClick={() => handleSettingsAction(item.action)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]">
+                  <button
+                    key={item.action}
+                    onClick={() => handleSettingsAction(item.action)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
+                  >
                     <item.icon size={15} className="shrink-0 text-zinc-400" />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.hasArrow && <ChevronRight size={13} className="text-zinc-600" />}
                   </button>
                 ))}
               </div>
+
               <div className="mx-3 h-px bg-zinc-800" />
+
               {/* Privacy */}
               <div className="p-2">
                 <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Data &amp; privacy</p>
                 {SETTINGS_PRIVACY.map((item) => (
-                  <button key={item.action} onClick={() => handleSettingsAction(item.action)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]">
+                  <button
+                    key={item.action}
+                    onClick={() => handleSettingsAction(item.action)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-50 active:scale-[0.98]"
+                  >
                     <item.icon size={15} className="shrink-0 text-zinc-400" />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.hasArrow && <ChevronRight size={13} className="text-zinc-600" />}
                   </button>
                 ))}
               </div>
+
               <div className="mx-3 h-px bg-zinc-800" />
+
               <div className="p-2">
-                <button onClick={() => { setSettingsOpen(false); onSignOut(); }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition hover:bg-zinc-800 hover:text-red-300 active:scale-[0.98]">
+                <button
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onSignOut();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition hover:bg-zinc-800 hover:text-red-300 active:scale-[0.98]"
+                >
                   <LogOut size={15} className="shrink-0" />
                   Sign out
                 </button>
@@ -270,20 +368,36 @@ export function Sidebar({
 
           {/* Account row */}
           <div className="flex items-center gap-2.5 px-1 mt-1">
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${
-              plan === "pro" ? "bg-indigo-600" : "bg-zinc-700"
-            }`}>
-              {initial}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-zinc-200">{displayName}</p>
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white transition hover:ring-2 hover:ring-indigo-500"
+              style={{ backgroundColor: plan === "pro" ? "#4f46e5" : "#3f3f46" }}
+              title="Edit Profile"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                initial
+              )}
+            </button>
+            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setProfileOpen(true)}>
+              <p className="truncate text-[13px] font-medium text-zinc-200 hover:text-white transition">
+                {displayName}
+              </p>
               <p className="truncate text-[10px] text-zinc-500">
-                {plan === "pro" ? "Pro Tier · 2FA Active" : "Free Tier"}
+                {twoFactorEnabled ? `${PLANS[plan].label} Tier · 2FA Active` : `${PLANS[plan].label} Tier`}
               </p>
             </div>
-            <button ref={gearBtnRef} aria-label="Settings" title="Settings"
+            <button
+              ref={gearBtnRef}
+              aria-label="Settings"
+              title="Settings"
               onClick={() => setSettingsOpen((v) => !v)}
-              className={`rounded-md p-1.5 transition duration-150 hover:bg-zinc-900 ${settingsOpen ? "bg-zinc-800 text-zinc-200" : "text-zinc-500 hover:text-zinc-200"}`}>
+              className={`rounded-md p-1.5 transition duration-150 hover:bg-zinc-900 ${
+                settingsOpen ? "bg-zinc-800 text-zinc-200" : "text-zinc-500 hover:text-zinc-200"
+              }`}
+            >
               <Settings size={15} />
             </button>
           </div>
